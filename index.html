@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>扫雷Pro - 经典扫雷游戏与AI助手</title>
+    <!-- 引入Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入Font Awesome -->
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <!-- 自定义配置 -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3b82f6',
+                        secondary: '#10b981',
+                        mine: '#ef4444',
+                        safe: '#10b981',
+                        warning: '#f59e0b',
+                        neutral: '#6b7280',
+                    },
+                    fontFamily: {
+                        inter: ['Inter', 'sans-serif'],
+                    },
+                },
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .cell-shadow {
+                box-shadow: inset 2px 2px 4px rgba(255, 255, 255, 0.6), inset -2px -2px 4px rgba(0, 0, 0, 0.3);
+            }
+            .cell-pressed {
+                box-shadow: inset 1px 1px 2px rgba(0, 0, 0, 0.3);
+            }
+            .grid-container {
+                display: grid;
+                gap: 1px;
+                background-color: #d1d5db;
+                border: 3px solid #d1d5db;
+            }
+            .button-standard {
+                @apply bg-gray-200 hover:bg-gray-300 active:bg-gray-400 text-gray-800 font-medium py-2 px-4 rounded transition duration-150 ease-in-out border border-gray-300 shadow-sm;
+            }
+            .counter {
+                @apply bg-black text-red-500 font-mono text-xl w-16 h-10 flex items-center justify-center leading-none;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 font-inter min-h-screen flex flex-col items-center justify-center p-4">
+    <div class="max-w-4xl w-full mx-auto bg-white rounded-xl shadow-lg overflow-hidden">
+        <!-- 游戏标题 -->
+        <header class="bg-primary text-white p-4 text-center">
+            <h1 class="text-[clamp(1.5rem,3vw,2.5rem)] font-bold">扫雷Pro</h1>
+            <p class="text-blue-100 mt-1">经典扫雷游戏与AI助手</p>
+        </header>
+
+        <!-- 游戏设置和控制区 -->
+        <div class="p-4 bg-gray-50 border-b border-gray-200">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <!-- 游戏难度选择 -->
+                <div class="flex items-center gap-2">
+                    <label for="difficulty" class="font-medium text-gray-700 whitespace-nowrap">难度:</label>
+                    <select id="difficulty" class="button-standard">
+                        <option value="beginner">初级 (9×9, 10雷)</option>
+                        <option value="intermediate">中级 (16×16, 40雷)</option>
+                        <option value="expert">高级 (30×16, 99雷)</option>
+                    </select>
+                </div>
+
+                <!-- 游戏状态显示 -->
+                <div class="flex items-center gap-4">
+                    <div class="counter" id="mine-counter">000</div>
+                    <button id="restart-button" class="bg-red-500 hover:bg-red-600 active:bg-red-700 text-white font-bold py-2 px-6 rounded-full transition duration-150 ease-in-out transform hover:scale-105 active:scale-95">
+                        <i class="fa fa-refresh"></i>
+                    </button>
+                    <div class="counter" id="timer">000</div>
+                </div>
+
+                <!-- AI控制按钮 -->
+                <div class="flex items-center gap-2">
+                    <button id="ai-solve-button" class="bg-secondary hover:bg-green-600 active:bg-green-700 text-white font-medium py-2 px-4 rounded transition duration-150 ease-in-out">
+                        <i class="fa fa-robot mr-2"></i>AI扫雷
+                    </button>
+                    <button id="ai-step-button" class="bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white font-medium py-2 px-4 rounded transition duration-150 ease-in-out">
+                        <i class="fa fa-step-forward mr-2"></i>单步AI
+                    </button>
+                    <!-- AI速度调节 -->
+                    <div class="flex items-center gap-2">
+                        <label for="ai-speed" class="text-gray-700 whitespace-nowrap text-sm">速度:</label>
+                        <input type="range" id="ai-speed" min="100" max="2000" step="100" value="1000" 
+                            class="w-24 h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer">
+                        <span id="speed-value" class="text-gray-700 font-mono text-sm">1.0s</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 游戏说明 -->
+        <div class="p-4 bg-gray-50 border-b border-gray-200">
+            <div class="text-gray-600 text-sm">
+                <p><i class="fa fa-info-circle mr-1"></i> 游戏规则：点击格子翻开，数字表示周围8个格子中的地雷数量。右键标记可能的地雷。AI会模拟人类逻辑思维进行扫雷，确保所有地雷都能通过逻辑判断确定。</p>
+            </div>
+        </div>
+
+        <!-- 游戏区域 -->
+        <div class="p-6 flex justify-center items-center bg-white">
+            <div id="game-container" class="relative"></div>
+        </div>
+
+        <!-- 游戏结果弹窗 -->
+        <div id="game-over-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+            <div class="bg-white p-8 rounded-xl shadow-2xl text-center max-w-md w-full mx-4">
+                <h2 id="game-over-title" class="text-3xl font-bold mb-4"></h2>
+                <p id="game-over-message" class="text-gray-600 mb-6"></p>
+                <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                    <button id="retry-with-same-mines" class="bg-warning hover:bg-amber-600 text-white font-bold py-3 px-8 rounded-lg transition duration-150 ease-in-out transform hover:scale-105 hidden">
+                        按照当前雷区分布重新开始
+                    </button>
+                    <button id="play-again-button" class="bg-primary hover:bg-blue-600 text-white font-bold py-3 px-8 rounded-lg transition duration-150 ease-in-out transform hover:scale-105">
+                        再来一局
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 游戏逻辑脚本 -->
+    <script src="game.js"></script>
+    <script src="ai.js"></script>
+    <script src="main.js"></script>
+    <!-- 用于测试修复后的AI在相同雷区无限次重新开始的功能 -->
+    <script src="test-fixed-ai-endless-retry.js"></script>
+  </body>
+</html>
